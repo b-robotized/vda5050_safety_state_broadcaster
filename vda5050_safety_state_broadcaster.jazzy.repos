@@ -1,0 +1,5 @@
+repositories:
+  vda5050_msgs:
+    type: git
+    url: git@github.com:ipa320/vda5050_msgs.git
+    version: ros2
