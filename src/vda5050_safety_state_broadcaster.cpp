@@ -192,39 +192,35 @@ controller_interface::return_type Vda5050SafetyStateBadcaster::update(
     estop_value |= static_cast<bool>(state_interfaces_[i].get_value());
   }
 
-  if (!estop_value)
+  if (estop_value)
   {
+    estop_msg = "manual";
+  }
+  else{
     j += static_cast<int>(params_.eStop_remote_interfaces.size());
     for (i; i < j; ++i)
     {
       estop_value |= static_cast<bool>(state_interfaces_[i].get_value());
     }
-  }
-  else
-  {
-    estop_msg = "manual";
-  }
-
-  if (!estop_value)
-  {
-    j += static_cast<int>(params_.eStop_autoack_interfaces.size());
-    for (i; i < j; ++i)
+    if (estop_value)
     {
-      estop_value |= static_cast<bool>(state_interfaces_[i].get_value());
+        estop_msg = "remote";
     }
-  }
-  else
-  {
-    estop_msg = "remote";
-  }
-
-  if (!estop_value)
-  {
-    estop_msg = "none";
-  }
-  else
-  {
-    estop_msg = "autoAck";
+    else
+    {
+        j += static_cast<int>(params_.eStop_autoack_interfaces.size());
+        for (i; i < j; ++i)
+        {
+            estop_value |= static_cast<bool>(state_interfaces_[i].get_value());
+        }
+        if (estop_value)
+        {
+            estop_msg = "autoack";
+        }
+        else{
+            estop_msg = "none";
+        }
+    }
   }
 
   if (
