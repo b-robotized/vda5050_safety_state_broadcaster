@@ -75,6 +75,15 @@ public:
   controller_interface::return_type update(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
+  bool safe_double_to_bool(double value)
+  {
+    if (std::isnan(value))
+    {
+      return false;
+    }
+    return value != 0.0;
+  }
+
 protected:
   std::shared_ptr<vda5050_safety_state_broadcaster::ParamListener> param_listener_;
   vda5050_safety_state_broadcaster::Params params_;

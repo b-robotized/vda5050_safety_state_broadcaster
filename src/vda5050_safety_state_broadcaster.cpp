@@ -183,43 +183,45 @@ controller_interface::return_type Vda5050SafetyStateBadcaster::update(
   int j = static_cast<int>(params_.fieldViolation_interfaces.size());
   for (i; i < j; ++i)
   {
-    fieldViolation_value |= static_cast<bool>(state_interfaces_[i].get_value());
+    fieldViolation_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
   }
 
   j += static_cast<int>(params_.eStop_manual_interfaces.size());
   for (i; i < j; ++i)
   {
-    estop_value |= static_cast<bool>(state_interfaces_[i].get_value());
+    estop_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
   }
 
   if (estop_value)
   {
     estop_msg = "manual";
   }
-  else{
+  else
+  {
     j += static_cast<int>(params_.eStop_remote_interfaces.size());
     for (i; i < j; ++i)
     {
-      estop_value |= static_cast<bool>(state_interfaces_[i].get_value());
+      estop_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
     }
     if (estop_value)
     {
-        estop_msg = "remote";
+      estop_msg = "remote";
     }
     else
     {
-        j += static_cast<int>(params_.eStop_autoack_interfaces.size());
-        for (i; i < j; ++i)
-        {
-            estop_value |= static_cast<bool>(state_interfaces_[i].get_value());
-        }
-        if (estop_value)
-        {
-            estop_msg = "autoack";
-        }
-        else{
-            estop_msg = "none";
-        }
+      j += static_cast<int>(params_.eStop_autoack_interfaces.size());
+      for (i; i < j; ++i)
+      {
+        estop_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
+      }
+      if (estop_value)
+      {
+        estop_msg = "autoack";
+      }
+      else
+      {
+        estop_msg = "none";
+      }
     }
   }
 
