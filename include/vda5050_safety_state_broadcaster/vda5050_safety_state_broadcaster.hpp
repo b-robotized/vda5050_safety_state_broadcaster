@@ -29,11 +29,11 @@
 #include "controller_interface/controller_interface.hpp"
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
-#include "realtime_tools/realtime_buffer.h"
-#include "realtime_tools/realtime_publisher.h"
+#include "realtime_tools/realtime_buffer.hpp"
+#include "realtime_tools/realtime_publisher.hpp"
 
+#include <vda5050_safety_state_broadcaster/vda5050_safety_state_broadcaster_parameters.hpp>
 #include "vda5050_msgs/msg/safety_state.hpp"
-#include "vda5050_safety_state_broadcaster_parameters.hpp"
 
 namespace vda5050_safety_state_broadcaster
 {
@@ -83,6 +83,8 @@ public:
     }
     return value != 0.0;
   }
+
+  double get_or_nan(int interface_cnt);
 
 protected:
   std::shared_ptr<vda5050_safety_state_broadcaster::ParamListener> param_listener_;

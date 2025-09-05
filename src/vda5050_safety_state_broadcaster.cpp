@@ -18,7 +18,7 @@
 // [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
 //
 
-#include "vda5050_safety_state_broadcaster/vda5050_safety_state_broadcaster.hpp"
+#include <vda5050_safety_state_broadcaster/vda5050_safety_state_broadcaster.hpp>
 
 #include <limits>
 #include <memory>
@@ -125,19 +125,19 @@ Vda5050SafetyStateBadcaster::state_interface_configuration() const
   state_interfaces_config.names.reserve(
     params_.eStop_autoack_interfaces.size() + params_.eStop_manual_interfaces.size() +
     params_.eStop_remote_interfaces.size() + params_.fieldViolation_interfaces.size());
-  for (auto const fieldViolation_interface : params_.fieldViolation_interfaces)
+  for (auto const & fieldViolation_interface : params_.fieldViolation_interfaces)
   {
     state_interfaces_config.names.push_back(fieldViolation_interface);
   }
-  for (auto const eStop_manual_interface : params_.eStop_manual_interfaces)
+  for (auto const & eStop_manual_interface : params_.eStop_manual_interfaces)
   {
     state_interfaces_config.names.push_back(eStop_manual_interface);
   }
-  for (auto const eStop_remote_interface : params_.eStop_remote_interfaces)
+  for (auto const & eStop_remote_interface : params_.eStop_remote_interfaces)
   {
     state_interfaces_config.names.push_back(eStop_remote_interface);
   }
-  for (auto const eStop_autoack_interface : params_.eStop_autoack_interfaces)
+  for (auto const & eStop_autoack_interface : params_.eStop_autoack_interfaces)
   {
     state_interfaces_config.names.push_back(eStop_autoack_interface);
   }
@@ -174,22 +174,22 @@ controller_interface::CallbackReturn Vda5050SafetyStateBadcaster::on_deactivate(
 }
 
 controller_interface::return_type Vda5050SafetyStateBadcaster::update(
-  const rclcpp::Time & time, const rclcpp::Duration & /*period*/)
+  const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   fieldViolation_value = false;
   estop_value = false;
 
   int i = 0;
   int j = static_cast<int>(params_.fieldViolation_interfaces.size());
-  for (i; i < j; ++i)
+  for (; i < j; ++i)
   {
-    fieldViolation_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
+    fieldViolation_value |= this->safe_double_to_bool(get_or_nan(i));
   }
 
   j += static_cast<int>(params_.eStop_manual_interfaces.size());
-  for (i; i < j; ++i)
+  for (; i < j; ++i)
   {
-    estop_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
+    estop_value |= this->safe_double_to_bool(get_or_nan(i));
   }
 
   if (estop_value)
@@ -199,9 +199,9 @@ controller_interface::return_type Vda5050SafetyStateBadcaster::update(
   else
   {
     j += static_cast<int>(params_.eStop_remote_interfaces.size());
-    for (i; i < j; ++i)
+    for (; i < j; ++i)
     {
-      estop_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
+      estop_value |= this->safe_double_to_bool(get_or_nan(i));
     }
     if (estop_value)
     {
@@ -210,9 +210,9 @@ controller_interface::return_type Vda5050SafetyStateBadcaster::update(
     else
     {
       j += static_cast<int>(params_.eStop_autoack_interfaces.size());
-      for (i; i < j; ++i)
+      for (; i < j; ++i)
       {
-        estop_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
+        estop_value |= this->safe_double_to_bool(get_or_nan(i));
       }
       if (estop_value)
       {
@@ -236,6 +236,16 @@ controller_interface::return_type Vda5050SafetyStateBadcaster::update(
   }
 
   return controller_interface::return_type::OK;
+}
+
+double Vda5050SafetyStateBadcaster::get_or_nan(int interface_cnt)
+{
+  auto opt = state_interfaces_[interface_cnt].get_optional<double>();
+  if (opt.has_value())
+  {
+    return static_cast<double>(*opt);
+  }
+  return std::numeric_limits<double>::quiet_NaN();
 }
 
 }  // namespace vda5050_safety_state_broadcaster
