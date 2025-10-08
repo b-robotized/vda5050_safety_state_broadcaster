@@ -19,10 +19,10 @@ Source of this file are templates in
 -->
 
 <library path="vda5050_safety_state_broadcaster">
-  <class name="vda5050_safety_state_broadcaster/Vda5050SafetyStateBadcaster"
-         type="vda5050_safety_state_broadcaster::Vda5050SafetyStateBadcaster" base_class_type="controller_interface::ControllerInterface">
+  <class name="vda5050_safety_state_broadcaster/Vda5050SafetyStateBroadcaster"
+         type="vda5050_safety_state_broadcaster::Vda5050SafetyStateBroadcaster" base_class_type="controller_interface::ControllerInterface">
   <description>
-    Vda5050SafetyStateBadcaster ros2_control controller.
+    vda5050_safety_state_broadcaster publishes the safety states as defined in the VDA 5050 standard as a control_msgs/VDA5050.
   </description>
   </class>
 </library>

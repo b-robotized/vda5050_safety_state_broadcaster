@@ -1,5 +1,4 @@
 // Copyright (c) 2025, b-robotized
-// Copyright (c) 2025, Stogl Robotics Consulting UG (haftungsbeschränkt) (template)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,23 +38,30 @@ namespace vda5050_safety_state_broadcaster
 {
 
 /**
- * \brief vda5050_safety_state_broadcaster for all or some state in a ros2_control system.
+ * \brief VDA5050 safety state broadcaster for all or some state in a ros2_control system.
  *
- * Vda5050SafetyStateBadcaster publishes state interfaces from ros2_control as ROS messages.
- * The following state interfaces are published:
- *    <state_joint>/xxxxx
+ * Vda5050SafetyStateBroadcaster publishes state interfaces from ros2_control as ROS messages.
+ * The state interfaces published can be configured via parameters:
  *
- * \param xxxxxx
+ * \param fieldViolation_interfaces that are used to acknowledge field violation events by setting
+ * the interface to 1.0.
+ * \param eStop_manual_interfaces that are used to manually acknowledge eStop events by setting the
+ * interface to 1.0.
+ * \param eStop_remote_interfaces that are used to remotely acknowledge eStop events by setting the
+ * interface to 1.0.
+ * \param eStop_autoack_interfaces that are used to autoacknowledge eStop events by setting the
+ * interface to 1.0.
  *
  * Publishes to:
  *
- * - \b xxxx (xxxx::msg::xxx): xxxx
+ * - \b vda5050_safety_state (vda5050_msgs::msg::SafetyState): safety state of the combined safety
+ * interfaces according the priority: eStop_manual > eStop_remote > eStop_autoack.
  *
  */
-class Vda5050SafetyStateBadcaster : public controller_interface::ControllerInterface
+class Vda5050SafetyStateBroadcaster : public controller_interface::ControllerInterface
 {
 public:
-  Vda5050SafetyStateBadcaster();
+  Vda5050SafetyStateBroadcaster();
 
   controller_interface::InterfaceConfiguration command_interface_configuration() const override;
 
@@ -75,7 +81,41 @@ public:
   controller_interface::return_type update(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
-  bool safe_double_to_bool(double value)
+protected:
+  vda5050_safety_state_broadcaster::Params params_;
+
+  std::shared_ptr<realtime_tools::RealtimePublisher<vda5050_msgs::msg::SafetyState>>
+    realtime_vda5050_safety_state_publisher_;
+
+private:
+  std::shared_ptr<vda5050_safety_state_broadcaster::ParamListener> param_listener_;
+  std::shared_ptr<rclcpp::Publisher<vda5050_msgs::msg::SafetyState>>
+    vda5050_safety_state_publisher_;
+
+  /**
+   * @brief Determines the current E-stop state based on the state interfaces.
+   * @return The E-stop type as defined in vda5050_msgs::msg::SafetyState.
+   */
+  vda5050_msgs::msg::SafetyState::_e_stop_type determineEstopState();
+
+  struct InterfaceIds
+  {
+    int manual_start = 0;
+    int remote_start = 0;
+    int autoack_start = 0;
+    int total_interfaces = 0;
+  };
+
+  InterfaceIds itfs_ids_;
+  bool fieldViolation_value = false;
+  std::string estop_msg = vda5050_msgs::msg::SafetyState::NONE;
+
+  /**
+   * @brief Safely converts a double value to bool, treating NaN as false.
+   * @param value The double value to convert.
+   * @return true if value is not NaN and not zero, false otherwise.
+   */
+  bool safe_double_to_bool(double value) const
   {
     if (std::isnan(value))
     {
@@ -83,23 +123,6 @@ public:
     }
     return value != 0.0;
   }
-
-  double get_or_nan(int interface_cnt);
-
-protected:
-  std::shared_ptr<vda5050_safety_state_broadcaster::ParamListener> param_listener_;
-  vda5050_safety_state_broadcaster::Params params_;
-
-  std::shared_ptr<rclcpp::Publisher<vda5050_msgs::msg::SafetyState>>
-    vda5050_safety_state_publisher_;
-  std::shared_ptr<realtime_tools::RealtimePublisher<vda5050_msgs::msg::SafetyState>>
-    realtime_vda5050_safety_state_publisher_;
-
-  bool fieldViolation_value = false;
-  bool estop_value = false;
-  std::string estop_msg = "none";
-
-private:
 };
 
 }  // namespace vda5050_safety_state_broadcaster

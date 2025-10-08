@@ -7,6 +7,7 @@ endif()
 
 set(THIS_PACKAGE_INCLUDE_DEPENDS
   builtin_interfaces
+  control_msgs
   controller_interface
   generate_parameter_library
   pluginlib
@@ -42,7 +43,6 @@ target_link_libraries(vda5050_safety_state_broadcaster PUBLIC
                       rclcpp::rclcpp
                       rclcpp_lifecycle::rclcpp_lifecycle
                       realtime_tools::realtime_tools
-                      ${sensor_msgs_TARGETS}
                       ${vda5050_msgs_TARGETS}
                       ${builtin_interfaces_TARGETS})
 
