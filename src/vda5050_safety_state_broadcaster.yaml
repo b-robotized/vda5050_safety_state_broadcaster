@@ -1,4 +1,4 @@
-# Copyright (c) 20224 Stogl Robotics Consulting UG (haftungsbeschränkt)
+# Copyright (c) 2025, b-robotized
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,20 +21,20 @@ vda5050_safety_state_broadcaster:
   fieldViolation_interfaces: {
     type: string_array,
     default_value: [],
-    description: "names of interfaces that are used to acknowledge field violation events. The interfaces are expected to be of type 'bool' and the acknowledge is done by setting the interface to 'true'.",
+    description: "names of interfaces that are used to acknowledge field violation events by setting the interface to 1.0.",
   }
   eStop_manual_interfaces: {
     type: string_array,
     default_value: [],
-    description: "names of interfaces that are used to manually acknowledge eStop events. The interfaces are expected to be of type 'bool' and the manual acknowledge is done by setting the interface to 'true'.",
+    description: "names of interfaces that are used to manually acknowledge eStop events by setting the interface to 1.0.",
   }
   eStop_remote_interfaces: {
     type: string_array,
     default_value: [],
-    description: "names of interfaces that are used to remotely acknowledge eStop events. The interfaces are expected to be of type 'bool' and the remote acknowledge is done by setting the interface to 'true'.",
+    description: "names of interfaces that are used to remotely acknowledge eStop events by setting the interface to 1.0.",
   }
   eStop_autoack_interfaces: {
     type: string_array,
     default_value: [],
-    description: "names of interfaces that are used to autoacknowledge eStop events. The interfaces are expected to be of type 'bool' and the autoacknowledge is done by setting the interface to 'true'.",
+    description: "names of interfaces that are used to autoacknowledge eStop events by setting the interface to 1.0.",
   }
