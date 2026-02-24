@@ -1,19 +1,17 @@
 cmake_minimum_required(VERSION 3.8)
 project(vda5050_safety_state_broadcaster)
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
-  add_compile_options(-Wall -Wextra -Werror=conversion -Werror=unused-but-set-variable -Werror=return-type -Werror=shadow)
-endif()
+find_package(ros2_control_cmake REQUIRED)
+set_compiler_options()
+export_windows_symbols()
 
 set(THIS_PACKAGE_INCLUDE_DEPENDS
-  builtin_interfaces
+  control_msgs
   controller_interface
   generate_parameter_library
   pluginlib
   rclcpp_lifecycle
   realtime_tools
-  vda5050_msgs
-  urdf
 )
 
 find_package(ament_cmake REQUIRED)
@@ -42,12 +40,34 @@ target_link_libraries(vda5050_safety_state_broadcaster PUBLIC
                       rclcpp::rclcpp
                       rclcpp_lifecycle::rclcpp_lifecycle
                       realtime_tools::realtime_tools
-                      ${sensor_msgs_TARGETS}
-                      ${vda5050_msgs_TARGETS}
-                      ${builtin_interfaces_TARGETS})
+                      ${control_msgs_TARGETS})
 
 
 pluginlib_export_plugin_description_file(controller_interface vda5050_safety_state_broadcaster.xml)
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gmock REQUIRED)
+  find_package(controller_manager REQUIRED)
+  find_package(hardware_interface REQUIRED)
+  find_package(ros2_control_test_assets REQUIRED)
+
+  add_definitions(-DTEST_FILES_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/test")
+  ament_add_gmock(test_load_vda5050_safety_state_broadcaster test/test_load_vda5050_safety_state_broadcaster.cpp)
+  target_include_directories(test_load_vda5050_safety_state_broadcaster PRIVATE include)
+  target_link_libraries(test_load_vda5050_safety_state_broadcaster
+    vda5050_safety_state_broadcaster
+    controller_manager::controller_manager
+    ros2_control_test_assets::ros2_control_test_assets
+  )
+
+  add_rostest_with_parameters_gmock(test_vda5050_safety_state_broadcaster
+    test/test_vda5050_safety_state_broadcaster.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/vda5050_safety_state_broadcaster_params.yaml)
+  target_include_directories(test_vda5050_safety_state_broadcaster PRIVATE include)
+  target_link_libraries(test_vda5050_safety_state_broadcaster
+    vda5050_safety_state_broadcaster
+  )
+endif()
 
 install(
   DIRECTORY include/
