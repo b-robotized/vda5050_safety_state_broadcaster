@@ -1,5 +1,4 @@
 // Copyright (c) 2025, b-robotized
-// Copyright (c) 2025, Stogl Robotics Consulting UG (haftungsbeschränkt) (template)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +17,7 @@
 // [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
 //
 
-#include "vda5050_safety_state_broadcaster/vda5050_safety_state_broadcaster.hpp"
+#include <vda5050_safety_state_broadcaster/vda5050_safety_state_broadcaster.hpp>
 
 #include <limits>
 #include <memory>
@@ -28,46 +27,15 @@
 
 #include "controller_interface/helpers.hpp"
 
-// namespace
-// {  // utility
-
-// // TODO(destogl): remove this when merged upstream
-// // Changed services history QoS to keep all so we don't lose any client service calls
-// static constexpr rmw_qos_profile_t rmw_qos_profile_services_hist_keep_all = {
-//   RMW_QOS_POLICY_HISTORY_KEEP_ALL,
-//   1,  // message queue depth
-//   RMW_QOS_POLICY_RELIABILITY_RELIABLE,
-//   RMW_QOS_POLICY_DURABILITY_VOLATILE,
-//   RMW_QOS_DEADLINE_DEFAULT,
-//   RMW_QOS_LIFESPAN_DEFAULT,
-//   RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
-//   RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
-//   false};
-
-// using ControllerReferenceMsg =
-// vda5050_safety_state_broadcaster::Vda5050SafetyStateBadcaster::ControllerReferenceMsg;
-
-// // called from RT control loop
-// void reset_controller_reference_msg(
-//   std::shared_ptr<ControllerReferenceMsg> & msg, const std::vector<std::string> & joint_names)
-// {
-//   msg->joint_names = joint_names;
-//   msg->displacements.resize(joint_names.size(), std::numeric_limits<double>::quiet_NaN());
-//   msg->velocities.resize(joint_names.size(), std::numeric_limits<double>::quiet_NaN());
-//   msg->duration = std::numeric_limits<double>::quiet_NaN();
-// }
-
-// }  // namespace
-
 namespace vda5050_safety_state_broadcaster
 {
 
-Vda5050SafetyStateBadcaster::Vda5050SafetyStateBadcaster()
+Vda5050SafetyStateBroadcaster::Vda5050SafetyStateBroadcaster()
 : controller_interface::ControllerInterface()
 {
 }
 
-controller_interface::CallbackReturn Vda5050SafetyStateBadcaster::on_init()
+controller_interface::CallbackReturn Vda5050SafetyStateBroadcaster::on_init()
 {
   try
   {
@@ -82,18 +50,19 @@ controller_interface::CallbackReturn Vda5050SafetyStateBadcaster::on_init()
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::CallbackReturn Vda5050SafetyStateBadcaster::on_configure(
+controller_interface::CallbackReturn Vda5050SafetyStateBroadcaster::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   params_ = param_listener_->get_params();
 
   try
   {
-    vda5050_safety_state_publisher_ = get_node()->create_publisher<vda5050_msgs::msg::SafetyState>(
-      "~/vda5050_safety_state", rclcpp::SystemDefaultsQoS());
+    vda5050_safety_state_publisher_ =
+      get_node()->create_publisher<control_msgs::msg::VDA5050SafetyState>(
+        "~/vda5050_safety_state", rclcpp::SystemDefaultsQoS());
 
     realtime_vda5050_safety_state_publisher_ =
-      std::make_shared<realtime_tools::RealtimePublisher<vda5050_msgs::msg::SafetyState>>(
+      std::make_shared<realtime_tools::RealtimePublisher<control_msgs::msg::VDA5050SafetyState>>(
         vda5050_safety_state_publisher_);
   }
   catch (const std::exception & e)
@@ -104,40 +73,52 @@ controller_interface::CallbackReturn Vda5050SafetyStateBadcaster::on_configure(
     return controller_interface::CallbackReturn::ERROR;
   }
 
+  if (!realtime_vda5050_safety_state_publisher_)
+  {
+    RCLCPP_ERROR(get_node()->get_logger(), "Realtime publisher not initialized");
+    return controller_interface::CallbackReturn::ERROR;
+  }
+  safety_state_msg_.e_stop.reserve(MAX_LENGTH);
+
+  // Initialize the indices for different interface types.
+  itfs_ids_ = {};
+  itfs_ids_.manual_start = params_.interfaces.fieldViolation.size();
+  itfs_ids_.remote_start = itfs_ids_.manual_start + params_.interfaces.eStop.manual.size();
+  itfs_ids_.autoack_start = itfs_ids_.remote_start + params_.interfaces.eStop.remote.size();
+  itfs_ids_.total_interfaces = itfs_ids_.autoack_start + params_.interfaces.eStop.autoack.size();
+
   RCLCPP_INFO(get_node()->get_logger(), "configure successful");
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
 controller_interface::InterfaceConfiguration
-Vda5050SafetyStateBadcaster::command_interface_configuration() const
+Vda5050SafetyStateBroadcaster::command_interface_configuration() const
 {
   return controller_interface::InterfaceConfiguration{
     controller_interface::interface_configuration_type::NONE};
 }
 
 controller_interface::InterfaceConfiguration
-Vda5050SafetyStateBadcaster::state_interface_configuration() const
+Vda5050SafetyStateBroadcaster::state_interface_configuration() const
 {
   controller_interface::InterfaceConfiguration state_interfaces_config;
 
   state_interfaces_config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
 
-  state_interfaces_config.names.reserve(
-    params_.eStop_autoack_interfaces.size() + params_.eStop_manual_interfaces.size() +
-    params_.eStop_remote_interfaces.size() + params_.fieldViolation_interfaces.size());
-  for (auto const fieldViolation_interface : params_.fieldViolation_interfaces)
+  state_interfaces_config.names.reserve(itfs_ids_.total_interfaces);
+  for (auto const & fieldViolation_interface : params_.interfaces.fieldViolation)
   {
     state_interfaces_config.names.push_back(fieldViolation_interface);
   }
-  for (auto const eStop_manual_interface : params_.eStop_manual_interfaces)
+  for (auto const & eStop_manual_interface : params_.interfaces.eStop.manual)
   {
     state_interfaces_config.names.push_back(eStop_manual_interface);
   }
-  for (auto const eStop_remote_interface : params_.eStop_remote_interfaces)
+  for (auto const & eStop_remote_interface : params_.interfaces.eStop.remote)
   {
     state_interfaces_config.names.push_back(eStop_remote_interface);
   }
-  for (auto const eStop_autoack_interface : params_.eStop_autoack_interfaces)
+  for (auto const & eStop_autoack_interface : params_.interfaces.eStop.autoack)
   {
     state_interfaces_config.names.push_back(eStop_autoack_interface);
   }
@@ -145,7 +126,7 @@ Vda5050SafetyStateBadcaster::state_interface_configuration() const
   return state_interfaces_config;
 }
 
-controller_interface::CallbackReturn Vda5050SafetyStateBadcaster::on_activate(
+controller_interface::CallbackReturn Vda5050SafetyStateBroadcaster::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   if (state_interfaces_.empty())
@@ -153,89 +134,94 @@ controller_interface::CallbackReturn Vda5050SafetyStateBadcaster::on_activate(
     RCLCPP_ERROR(get_node()->get_logger(), "No state interfaces found to publish.");
     return controller_interface::CallbackReturn::FAILURE;
   }
+  for (auto i = 0u; i < state_interfaces_.size(); ++i)
+  {
+    if (
+      state_interfaces_[i].get_data_type() != hardware_interface::HandleDataType::DOUBLE &&
+      state_interfaces_[i].get_data_type() != hardware_interface::HandleDataType::BOOL)
+    {
+      RCLCPP_ERROR(
+        get_node()->get_logger(),
+        "State interface '%s' (%s) is neither of type double nor bool. The "
+        "Vda5050SafetyStateBroadcaster only "
+        "supports state interfaces that support double or bool datatype.",
+        state_interfaces_[i].get_name().c_str(),
+        state_interfaces_[i].get_data_type().to_string().c_str());
+      return CallbackReturn::FAILURE;
+    }
+  }
 
-  param_listener_->refresh_dynamic_parameters();
+  if (!realtime_vda5050_safety_state_publisher_)
+  {
+    RCLCPP_ERROR(get_node()->get_logger(), "Realtime publisher not initialized");
+    return controller_interface::CallbackReturn::FAILURE;
+  }
 
-  // get parameters from the listener in case they were updated
-  params_ = param_listener_->get_params();
-
-  auto & safety_state_msg = realtime_vda5050_safety_state_publisher_->msg_;
-
-  safety_state_msg.e_stop = "none";
-  safety_state_msg.field_violation = false;
+  safety_state_msg_.e_stop = control_msgs::msg::VDA5050SafetyState::NONE;
+  safety_state_msg_.field_violation = false;
+  realtime_vda5050_safety_state_publisher_->try_publish(safety_state_msg_);
 
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::CallbackReturn Vda5050SafetyStateBadcaster::on_deactivate(
+controller_interface::CallbackReturn Vda5050SafetyStateBroadcaster::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::return_type Vda5050SafetyStateBadcaster::update(
-  const rclcpp::Time & time, const rclcpp::Duration & /*period*/)
+controller_interface::return_type Vda5050SafetyStateBroadcaster::update(
+  const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
   fieldViolation_value = false;
-  estop_value = false;
-
-  int i = 0;
-  int j = static_cast<int>(params_.fieldViolation_interfaces.size());
-  for (i; i < j; ++i)
+  for (size_t itf_idx = 0; itf_idx < itfs_ids_.manual_start; ++itf_idx)
   {
-    fieldViolation_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
-  }
-
-  j += static_cast<int>(params_.eStop_manual_interfaces.size());
-  for (i; i < j; ++i)
-  {
-    estop_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
-  }
-
-  if (estop_value)
-  {
-    estop_msg = "manual";
-  }
-  else
-  {
-    j += static_cast<int>(params_.eStop_remote_interfaces.size());
-    for (i; i < j; ++i)
+    if (get_bool_itf_value(state_interfaces_[itf_idx]))
     {
-      estop_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
-    }
-    if (estop_value)
-    {
-      estop_msg = "remote";
-    }
-    else
-    {
-      j += static_cast<int>(params_.eStop_autoack_interfaces.size());
-      for (i; i < j; ++i)
-      {
-        estop_value |= this->safe_double_to_bool(state_interfaces_[i].get_value());
-      }
-      if (estop_value)
-      {
-        estop_msg = "autoack";
-      }
-      else
-      {
-        estop_msg = "none";
-      }
+      fieldViolation_value = true;
+      break;
     }
   }
 
-  if (
-    realtime_vda5050_safety_state_publisher_ && realtime_vda5050_safety_state_publisher_->trylock())
-  {
-    auto & safety_state_msg = realtime_vda5050_safety_state_publisher_->msg_;
+  estop_msg = determineEstopState();
 
-    safety_state_msg.field_violation = fieldViolation_value;
-    safety_state_msg.e_stop = estop_msg;
-    realtime_vda5050_safety_state_publisher_->unlockAndPublish();
+  if (realtime_vda5050_safety_state_publisher_)
+  {
+    safety_state_msg_.field_violation = fieldViolation_value;
+    safety_state_msg_.e_stop = estop_msg;
+    realtime_vda5050_safety_state_publisher_->try_publish(safety_state_msg_);
   }
 
   return controller_interface::return_type::OK;
+}
+
+control_msgs::msg::VDA5050SafetyState::_e_stop_type
+Vda5050SafetyStateBroadcaster::determineEstopState()
+{
+  // Scan all e-stop interfaces and return the type of the first active one
+  for (size_t itf_idx = itfs_ids_.manual_start; itf_idx < itfs_ids_.total_interfaces; ++itf_idx)
+  {
+    if (get_bool_itf_value(state_interfaces_[itf_idx]))
+    {
+      RCLCPP_DEBUG(
+        get_node()->get_logger(), "E-stop triggered by interface %s",
+        state_interfaces_[itf_idx].get_name().c_str());
+      if (itf_idx < itfs_ids_.remote_start)
+      {
+        return control_msgs::msg::VDA5050SafetyState::MANUAL;
+      }
+      else if (itf_idx < itfs_ids_.autoack_start)
+      {
+        return control_msgs::msg::VDA5050SafetyState::REMOTE;
+      }
+      else
+      {
+        return control_msgs::msg::VDA5050SafetyState::AUTO_ACK;
+      }
+    }
+  }
+
+  return control_msgs::msg::VDA5050SafetyState::NONE;
 }
 
 }  // namespace vda5050_safety_state_broadcaster
@@ -243,5 +229,5 @@ controller_interface::return_type Vda5050SafetyStateBadcaster::update(
 #include "pluginlib/class_list_macros.hpp"
 
 PLUGINLIB_EXPORT_CLASS(
-  vda5050_safety_state_broadcaster::Vda5050SafetyStateBadcaster,
+  vda5050_safety_state_broadcaster::Vda5050SafetyStateBroadcaster,
   controller_interface::ControllerInterface)
